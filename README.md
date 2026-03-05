@@ -19,4 +19,4 @@ Productivity app with AI agent that gives weekly suggestions and tips based on y
 | (Stretch Goal) Task classification | if time permits | [Link](https://github.com/osimmov/junior-independent-study/issues/11) |
 | (Stretch Goal) Task completion streak | if time permits | [Link](https://github.com/osimmov/junior-independent-study/issues/12) |
 | (Stretch Goal) Productivity metrics dashboard | if time permits | [Link](https://github.com/osimmov/junior-independent-study/issues/13) |
-| User Feedback | March 15th | [Link](https://github.com/osimmov/junior-independent-study/issues/14) |
+| User Feedback | March 15th | [Link](https://github.com/osimmov/junior-independent-study/issues/14) |BB
