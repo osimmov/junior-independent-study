@@ -21,14 +21,16 @@ function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onE
     }
   }
 
-  // Visual highlight for today's column header.
+  // IsToday highlights the header in orange.
   const headerClass = isToday ? 'text-orange-500' : 'text-gray-400'
 
   return (
     <div
       className="flex flex-col flex-1 min-w-[200px] max-w-[260px] border-r border-gray-800"
       // This attribute is used by HorizonPanel to find today's column and scroll to it.
-      {...(isToday && { 'data-today': '' })}
+      {...(isToday && { 'data-today': '' })} //{...(...)} spreads that result onto the <div> props:
+      // If it’s { 'data-today': '' }, the div gets a data-today attribute.
+      // If it’s false, nothing is spread, so no attribute is added.
     >
       {/* Header: Day + Date */}
       <div className="px-4 pt-4 pb-2">

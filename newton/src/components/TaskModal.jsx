@@ -3,14 +3,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 // TaskModal shows editable task details (title + description).
 // It is "save-on-close": closing via Escape/outside click/X saves any edits first.
 function TaskModal({ task, onSave, onRequestClose }) {
+  // Local editable fields for the task's title and description.
   const [title, setTitle] = useState(task.text)
   const [description, setDescription] = useState(task.description ?? '')
 
+  // Snapshot of the task when the modal opened, used to detect real changes.
   const initial = useMemo(
     () => ({ text: task.text, description: task.description ?? '' }),
     [task.text, task.description]
   )
 
+  // Ref to the dialog container (for focus management or future DOM work).
   const dialogRef = useRef(null)
 
   // Keep local draft state in sync if the modal is opened for a different task.
@@ -32,17 +35,24 @@ function TaskModal({ task, onSave, onRequestClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, initial])
 
+  // Decide whether we need to save anything before closing.
   const maybeSave = () => {
+    // Use the trimmed title if it's non-empty; otherwise fall back to the original.
     const nextTitle = title.trim() ? title.trim() : initial.text
     const nextDescription = description
 
+    // Check if either the title or description actually changed.
     const titleChanged = nextTitle !== initial.text
     const descriptionChanged = nextDescription !== initial.description
 
+    // If nothing changed, do nothing.
     if (!titleChanged && !descriptionChanged) return
+
+    // Notify the parent about the updated values, including the old title for logging.
     onSave({ text: nextTitle, description: nextDescription }, { oldText: initial.text })
   }
 
+  // Helper that saves any changes (if needed) and then closes the modal.
   const closeAndSave = () => {
     maybeSave()
     onRequestClose()

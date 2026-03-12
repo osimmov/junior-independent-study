@@ -7,23 +7,27 @@ function ProgressPanel({ activities }) {
     const key = a.date
     if (!byDate[key]) byDate[key] = []
     byDate[key].push(a)
-  })
+  }) //Take every activity in activities, look at its a.date (like "2026-03-12"),
+  // Use that date as a key in the byDate object,
+  // Collect all activities with the same date into the same array.
 
+  
   // Render newest dates first (so the log reads from newest → oldest).
   const dates = Object.keys(byDate).sort((a, b) => new Date(b) - new Date(a))
 
-  // Formats "2026-02-25" => "Wed, Feb 25"
   const formatDate = (dateStr) => {
-    const d = new Date(dateStr)
+    // Interpret the stored YYYY-MM-DD as a local date so it lines up
+    // with the user's calendar day rather than UTC.
+    const d = new Date(`${dateStr}T00:00:00`)
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-  }
+  }//.toLocaleDateString is a method that formats a date object into a string.
 
   // Formats "HH:MM" (24-hour) => "H:MM AM/PM"
   const formatTime = (timeStr) => {
     const [h, m] = timeStr.split(':')
     const hour = parseInt(h, 10)
     const ampm = hour >= 12 ? 'PM' : 'AM'
-    const h12 = hour % 12 || 12
+    const h12 = hour % 12 || 12//If hour % 12 is 0 (i.e. hour is 0 or 12), || falls back to 12.
     return `${h12}:${m} ${ampm}`
   }
 
@@ -82,7 +86,7 @@ function ProgressPanel({ activities }) {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        <span>{rangeStart} — {rangeEnd}</span>
+        {/* <span>{rangeStart} — {rangeEnd}</span> */}
       </div>
 
       {dates.length === 0 ? (
@@ -94,8 +98,8 @@ function ProgressPanel({ activities }) {
             <hr className="border-gray-800 mb-3" />
             <ul className="space-y-2">
               {byDate[dateKey]
-                // Sort within a day so the latest time appears first.
-                .sort((a, b) => (b.time > a.time ? 1 : -1))
+                // Sort within a day by time (HH:MM), latest first.
+                .sort((a, b) => b.time.localeCompare(a.time))
                 .map((a) => (
                   <li key={a.id} className="flex items-center text-sm text-gray-400">
                     {getIcon(a.type)}

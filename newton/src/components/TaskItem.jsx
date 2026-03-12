@@ -33,6 +33,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed
     }
   }
 
+  // hasDescription checks if the task has a description (and if it’s not just whitespace).
   const hasDescription = Boolean(task.description && task.description.trim())
 
   return (
@@ -78,7 +79,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed
             task.completed ? 'line-through text-gray-500' : 'text-gray-300'
           }`}>
             <span>{task.text}</span>
-            {/* If a task has a non-empty description, show a small indicator icon. */}
+            {/* {Description icon} */}
             {hasDescription && (
               <svg
                 className="w-4 h-4 text-gray-500"

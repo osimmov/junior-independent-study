@@ -37,7 +37,8 @@ function dateToKey(date) {
 function loadTasks(dates) {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (!saved) return null
+    if (!saved) 
+      return null; //If there’s no saved data, return null.
     const data = JSON.parse(saved)
     const days = data.days ?? {}
     const result = {}
@@ -89,11 +90,14 @@ function createTask(text) {
   }
 }
 
-// Prepends a new activity entry to the activity list.
-// (We add newest first so Progress shows recent items on top.)
 function addActivity(activities, type, taskName) {
   const now = new Date()
-  const date = now.toISOString().slice(0, 10)
+  // Use the user's local calendar date (YYYY-MM-DD) instead of UTC,
+  // so activity entries appear under the expected "today" in ProgressPanel.
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const date = `${year}-${month}-${day}`
   const time = now.toTimeString().slice(0, 5)
   return [
     { id: crypto.randomUUID(), date, time, type, taskName },
