@@ -3,14 +3,18 @@ import Sidebar from './components/Sidebar'
 import HorizonPanel from './components/HorizonPanel'
 import ProgressPanel from './components/ProgressPanel'
 import AIInsightsPanel from './components/AIInsightsPanel'
+import TaskModal from './components/TaskModal'
 import './App.css'
 
+// Single localStorage key used to persist the app state in the browser.
 const STORAGE_KEY = 'newton-data'
 
+// Builds the list of day "columns" shown in Horizon.
+// Right now it's a fixed range (Feb 5 -> Mar 15 of the current year).
 function getDateRange() {
   const year = new Date().getFullYear()
-  const start = new Date(year, 1, 5)   // Feb 5(1 is February, 5 is the day)
-  const end = new Date(year, 2, 15)    // Mar 15 (2 is March)
+  const start = new Date(year, 0, 5)   // Feb 5(1 is February, 5 is the day)
+  const end = new Date(year, 4, 31)    // May 31 (4 is May)
 
   const dates = []
   const d = new Date(start)
@@ -21,10 +25,15 @@ function getDateRange() {
   return dates
 }
 
+// Converts a Date object into a stable string key like "2026-02-25".
+// We use this as the dictionary key for tasks-per-day.
 function dateToKey(date) {
   return date.toISOString().slice(0, 10)
 }
 
+// Reads tasks from localStorage and returns a dictionary:
+// { "YYYY-MM-DD": [task, task, ...], ... }
+// If a day doesn't exist in storage yet, we default it to an empty array.
 function loadTasks(dates) {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -42,6 +51,7 @@ function loadTasks(dates) {
   }
 }
 
+// Reads the progress/activity log from localStorage.
 function loadActivities() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -53,6 +63,9 @@ function loadActivities() {
   }
 }
 
+// Persists tasks + activity log to localStorage.
+// We merge tasksByDate into any existing stored "days" so previously saved
+// dates don't get wiped out if they're not currently rendered.
 function saveToStorage(tasksByDate, activities) {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -66,14 +79,18 @@ function saveToStorage(tasksByDate, activities) {
   }
 }
 
+// Creates a single task object.
 function createTask(text) {
   return {
     id: crypto.randomUUID(),
     text,
+    description: '',
     completed: false,
   }
 }
 
+// Prepends a new activity entry to the activity list.
+// (We add newest first so Progress shows recent items on top.)
 function addActivity(activities, type, taskName) {
   const now = new Date()
   const date = now.toISOString().slice(0, 10)
@@ -85,22 +102,33 @@ function addActivity(activities, type, taskName) {
 }
 
 function App() {
+  // Which panel is visible (controlled by the sidebar).
   const [activePanel, setActivePanel] = useState('horizon')
+
+  // Horizon's date columns. Stored once so it doesn't rebuild on every render.
   const [dates] = useState(getDateRange)
 
+  // Tasks are stored as a dictionary keyed by date (YYYY-MM-DD).
   const [tasksByDate, setTasksByDate] = useState(() => {
     const loaded = loadTasks(dates)
     return loaded ?? {}
   })
+
+  // Activity history shown in the Progress panel.
   const [activities, setActivities] = useState(() => {
     const loaded = loadActivities()
     return loaded ?? []
   })
 
+  // When set, the TaskModal is visible for a specific task (identified by dateKey + taskId).
+  const [modalTaskRef, setModalTaskRef] = useState(null)
+
+  // Save whenever tasks or activities change.
   useEffect(() => {
     saveToStorage(tasksByDate, activities)
   }, [tasksByDate, activities])
 
+  // Adds a task to a specific date.
   const handleAddTask = useCallback((dateKey, text) => {
     setTasksByDate((prev) => {
       const dayTasks = prev[dateKey] ?? []
@@ -109,6 +137,8 @@ function App() {
     setActivities((prev) => addActivity(prev, 'created', text))
   }, [])
 
+  // Toggles a task complete/incomplete.
+  // We log an activity only when a task becomes completed (not when unchecking).
   const handleToggleTask = useCallback((dateKey, taskId) => {
     const dayTasks = tasksByDate[dateKey] ?? []
     const task = dayTasks.find((t) => t.id === taskId)
@@ -129,6 +159,8 @@ function App() {
     }
   }, [tasksByDate])
 
+  // Updates a task's text.
+  // The Progress log uses oldText (when available) so you can see what was renamed.
   const handleEditTask = useCallback((dateKey, taskId, newText, oldText) => {
     setTasksByDate((prev) => {
       const dayTasks = prev[dateKey] ?? []
@@ -142,6 +174,7 @@ function App() {
     setActivities((prev) => addActivity(prev, 'edited', oldText || newText))
   }, [])
 
+  // Deletes a task from a given date.
   const handleDeleteTask = useCallback((dateKey, taskId) => {
     const dayTasks = tasksByDate[dateKey] ?? []
     const task = dayTasks.find((t) => t.id === taskId)
@@ -156,10 +189,54 @@ function App() {
     }
   }, [tasksByDate])
 
+  // Opens the modal for a particular task.
+  const openTaskModal = useCallback((dateKey, taskId) => {
+    setModalTaskRef({ dateKey, taskId })
+  }, [])
+
+  // Closes the modal (saving is handled by the modal before it calls this).
+  const closeTaskModal = useCallback(() => {
+    setModalTaskRef(null)
+  }, [])
+
+  // Applies a partial update to a task (title and/or description) and logs a single edit activity.
+  const handleModalSave = useCallback((dateKey, taskId, patch, meta) => {
+    const dayTasks = tasksByDate[dateKey] ?? []
+    const task = dayTasks.find((t) => t.id === taskId)
+    if (!task) return
+
+    const nextText = patch.text ?? task.text
+    const nextDescription = patch.description ?? (task.description ?? '')
+
+    const textChanged = nextText !== task.text
+    const descriptionChanged = nextDescription !== (task.description ?? '')
+    if (!textChanged && !descriptionChanged) return
+
+    setTasksByDate((prev) => {
+      const dayTasks = prev[dateKey] ?? []
+      return {
+        ...prev,
+        [dateKey]: dayTasks.map((t) =>
+          t.id === taskId ? { ...t, ...patch } : t
+        ),
+      }
+    })
+    setActivities((prev) => addActivity(prev, 'edited', meta?.oldText || task.text))
+  }, [tasksByDate])
+
+  // Resolve the currently open modal task from state.
+  const modalTask = (() => {
+    if (!modalTaskRef) return null
+    const dayTasks = tasksByDate[modalTaskRef.dateKey] ?? []
+    return dayTasks.find((t) => t.id === modalTaskRef.taskId) ?? null
+  })()
+
   return (
+    // App "shell": sidebar on the left, active panel on the right.
     <div className="flex h-screen text-gray-300" style={{ backgroundColor: '#1A1A1A' }}>
       <Sidebar activePanel={activePanel} onSelect={setActivePanel} />
       <main className="flex-1 flex flex-col min-w-0">
+        {/* Horizon: main task timeline view */}
         {activePanel === 'horizon' && (
           <HorizonPanel
             dates={dates}
@@ -168,11 +245,23 @@ function App() {
             onToggleTask={handleToggleTask}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
+            onOpenTask={openTaskModal}
           />
         )}
+        {/* Progress: activity log */}
         {activePanel === 'progress' && <ProgressPanel activities={activities} />}
+        {/* AI Insights: UI-only panel for now */}
         {activePanel === 'insights' && <AIInsightsPanel />}
       </main>
+
+      {/* Task details modal (only shown when a task is selected). */}
+      {modalTaskRef && modalTask && (
+        <TaskModal
+          task={modalTask}
+          onSave={(patch, meta) => handleModalSave(modalTaskRef.dateKey, modalTaskRef.taskId, patch, meta)}
+          onRequestClose={closeTaskModal}
+        />
+      )}
     </div>
   )
 }

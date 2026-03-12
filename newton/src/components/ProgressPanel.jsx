@@ -1,17 +1,24 @@
+// Progress panel: renders a readable history of task changes.
+// The parent (App.jsx) records activities; this component only formats and displays them.
 function ProgressPanel({ activities }) {
+  // Group activities by date (YYYY-MM-DD) so we can render sections per day.
   const byDate = {}
   activities.forEach((a) => {
     const key = a.date
     if (!byDate[key]) byDate[key] = []
     byDate[key].push(a)
   })
+
+  // Render newest dates first (so the log reads from newest → oldest).
   const dates = Object.keys(byDate).sort((a, b) => new Date(b) - new Date(a))
 
+  // Formats "2026-02-25" => "Wed, Feb 25"
   const formatDate = (dateStr) => {
     const d = new Date(dateStr)
     return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
 
+  // Formats "HH:MM" (24-hour) => "H:MM AM/PM"
   const formatTime = (timeStr) => {
     const [h, m] = timeStr.split(':')
     const hour = parseInt(h, 10)
@@ -20,6 +27,7 @@ function ProgressPanel({ activities }) {
     return `${h12}:${m} ${ampm}`
   }
 
+  // Icon per activity type (created/edited/deleted/completed).
   const getIcon = (type) => {
     if (type === 'created') {
       return (
@@ -50,6 +58,7 @@ function ProgressPanel({ activities }) {
     return null
   }
 
+  // Turns an activity record into a readable sentence.
   const getDescription = (a) => {
     const name = <span className="bg-gray-700/50 px-1 rounded text-gray-200">{a.taskName}</span>
     if (a.type === 'created') return <>{name} was created</>
@@ -59,6 +68,7 @@ function ProgressPanel({ activities }) {
     return a.description
   }
 
+  // Header-only UI: display the range "start of this month — Today".
   const startOfMonth = new Date()
   startOfMonth.setDate(1)
   startOfMonth.setMonth(startOfMonth.getMonth())
@@ -84,6 +94,7 @@ function ProgressPanel({ activities }) {
             <hr className="border-gray-800 mb-3" />
             <ul className="space-y-2">
               {byDate[dateKey]
+                // Sort within a day so the latest time appears first.
                 .sort((a, b) => (b.time > a.time ? 1 : -1))
                 .map((a) => (
                   <li key={a.id} className="flex items-center text-sm text-gray-400">

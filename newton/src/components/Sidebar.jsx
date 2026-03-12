@@ -1,3 +1,5 @@
+// Left navigation for switching between panels.
+// `activePanel` controls which icon is highlighted, `onSelect` updates the selection.
 function Sidebar({ activePanel, onSelect }) {
   return (
     <aside className="w-14 flex flex-col items-center py-4 border-r border-gray-800" style={{ backgroundColor: '#1A1A1A' }}>
@@ -8,6 +10,7 @@ function Sidebar({ activePanel, onSelect }) {
         className="relative w-full flex justify-center py-4 hover:bg-white/5 transition-colors"
         aria-label="Horizon"
       >
+        {/* The vertical indicator line for the active panel. */}
         {activePanel === 'horizon' && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-gray-300 rounded-full" />
         )}
@@ -25,6 +28,7 @@ function Sidebar({ activePanel, onSelect }) {
         className="relative w-full flex justify-center py-4 hover:bg-white/5 transition-colors"
         aria-label="Progress"
       >
+        {/* The vertical indicator line for the active panel. */}
         {activePanel === 'progress' && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-gray-300 rounded-full" />
         )}
@@ -42,6 +46,7 @@ function Sidebar({ activePanel, onSelect }) {
         className="relative w-full flex justify-center py-4 hover:bg-white/5 transition-colors"
         aria-label="AI Insights"
       >
+        {/* The vertical indicator line for the active panel. */}
         {activePanel === 'insights' && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-gray-300 rounded-full" />
         )}

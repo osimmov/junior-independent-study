@@ -2,12 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Vite will inject the compiled JS/CSS at runtime during dev/build. -->
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Newton</title>
   </head>
   <body>
-    <div id="root"></div>**8**
-    <script type="module" src="/src/main.jsx"></script><!--Connect main.jsx-->
+    <!-- React mounts the entire app into this div. -->
+    <div id="root"></div>
+
+    <!-- App entry point (Vite loads this as an ES module). -->
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

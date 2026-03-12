@@ -1,3 +1,5 @@
+// AI Insights panel (UI-only for now).
+// In a future version, "Get AI Insight" could call an LLM and replace these mock bullets.
 function AIInsightsPanel() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
@@ -9,6 +11,7 @@ function AIInsightsPanel() {
         Get AI Insight
       </button>
 
+      {/* Mock insights to demonstrate the intended UI. */}
       <ul className="space-y-3 text-gray-400 text-sm">
         <li className="flex gap-2">
           <span className="text-gray-500">•</span>

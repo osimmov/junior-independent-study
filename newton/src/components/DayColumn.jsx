@@ -1,12 +1,19 @@
 import { useState } from 'react'
 import TaskItem from './TaskItem'
 
-function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onEditTask, onDeleteTask }) {
+// One day "block" in the Horizon view.
+// - Shows the day + date (highlighted if it's today)
+// - Shows tasks for that date
+// - Includes an input to add a new task for this date
+function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onEditTask, onDeleteTask, onOpenTask }) {
+  // Local input state (we don't persist the input itself, only tasks).
   const [inputValue, setInputValue] = useState('')
 
+  // Human-readable header labels derived from the Date object.
   const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
   const dateStr = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 
+  // Adds a task when the user presses Enter in the input field.
   const handleAdd = (e) => {
     if (e.key === 'Enter' && inputValue.trim()) {
       onAddTask(dateKey, inputValue.trim())
@@ -14,11 +21,13 @@ function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onE
     }
   }
 
+  // Visual highlight for today's column header.
   const headerClass = isToday ? 'text-orange-500' : 'text-gray-400'
 
   return (
     <div
       className="flex flex-col flex-1 min-w-[200px] max-w-[260px] border-r border-gray-800"
+      // This attribute is used by HorizonPanel to find today's column and scroll to it.
       {...(isToday && { 'data-today': '' })}
     >
       {/* Header: Day + Date */}
@@ -29,7 +38,7 @@ function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onE
         </h2>
       </div>
 
-      {/* Task list with Add input right below last task */}
+      {/* Task list (oldest at top, newest at bottom). The Add input stays under the last task. */}
       <div className="flex-1 overflow-y-auto px-4 pb-4 min-h-[80px]">
         {tasks.map((task) => (
           <TaskItem
@@ -38,9 +47,11 @@ function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onE
             onToggle={onToggleTask}
             onEdit={onEditTask}
             onDelete={onDeleteTask}
+            onOpen={() => onOpenTask(task.id)}
           />
         ))}
         <div className="pt-2">
+          {/* "Add..." input is inside the scrollable area so it moves down as tasks grow. */}
           <input
             type="text"
             placeholder="Add..."
