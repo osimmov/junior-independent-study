@@ -176,6 +176,34 @@ The system intentionally avoids giving instructions, instead providing reflectiv
 respond based on their own judgement. This reinforces the role of Newton as a cognitive supporter rather than augmenter. By 
 presenting the feedback in a clear format, we help the user to quickly grasp the patterns in their behavior, avoiding the need for 
 manual analysis.
+
+\section{Implementation}
+Newton is built as a web-application that combines the UI with the AI analysis tool. The interface design of Newton is inspired by 
+the Timestripe productivity application, infinite horizontal timeline feature in particular. Users can scroll infinitely to the left 
+to view past days and to the right to plan future tasks, with each day represented as a column. Tasks are organized within these day
+ columns, allowing users to visually structure their workflow over time. The application is composed of several key components,
+  including a Sidebar for navigation, a Horizon panel for task planning, a Progress panel for viewing activity logs, and an AI 
+  Insights panel for reflective feedback. The Horizon panel allows users to create and manage tasks across different dates, while
+   the Progress panel records and organizes all changes made within the system. The AI Insights panel then presents the generated
+    reflections based on this data. Together, these components create a continuous loop where user actions are recorded, analyzed,
+     and reflected back in a way that supports awareness and adjustment.
+
+From the implementation perspective, the system is structured using a component-based architecture in React. The main application 
+initializes the interface and manages state, including storing tasks as date-keyed objects and maintaining change logs. Components 
+such as DayColumn and TaskItem handle task-level interactions, while the TaskModal provides a more detailed editing interface. Data 
+persistence is handled through local storage, allowing user activity to be retained across sessions without requiring a backend. For
+ the AI component, the current implementation uses a locally deployed DeepSeek 7B model to generate insights. While this approach 
+ offers advantages in terms of privacy and control, it introduces latency, with response times of several minutes. Future iterations
+  may explore external API-based models, such as ChatGPT, which could significantly reduce response time at the cost of reduced data 
+  locality and potential privacy considerations.
+
+
+\section{Results}
+(Testing the platform with real users, around ~10 people who use a task manager on a daily basis, and ask for their opinion 
+about the usefulness of the software. Need HSRC approval)
+
+\section{Analysis and Discussion}
+
 \section{Conclusion}
 
 \bibliographystyle{acm}

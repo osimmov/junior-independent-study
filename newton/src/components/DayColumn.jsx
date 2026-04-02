@@ -5,7 +5,8 @@ import TaskItem from './TaskItem'
 // - Shows the day + date (highlighted if it's today)
 // - Shows tasks for that date
 // - Includes an input to add a new task for this date
-function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onEditTask, onDeleteTask, onOpenTask }) {
+// - Uses a fixed width so the horizontal scroll math stays consistent.
+function DayColumn({ dateKey, date, tasks, isToday, columnWidth = 280, onAddTask, onToggleTask, onEditTask, onDeleteTask, onOpenTask }) {
   // Local input state (we don't persist the input itself, only tasks).
   const [inputValue, setInputValue] = useState('')
 
@@ -26,7 +27,8 @@ function DayColumn({ dateKey, date, tasks, isToday, onAddTask, onToggleTask, onE
 
   return (
     <div
-      className="flex flex-col flex-1 min-w-[200px] max-w-[260px] border-r border-gray-800"
+      className="flex flex-col flex-shrink-0 min-w-0 border-r border-gray-800"
+      style={{ width: `${columnWidth}px` }}
       // This attribute is used by HorizonPanel to find today's column and scroll to it.
       {...(isToday && { 'data-today': '' })} //{...(...)} spreads that result onto the <div> props:
       // If it’s { 'data-today': '' }, the div gets a data-today attribute.

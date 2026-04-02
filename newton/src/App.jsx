@@ -9,22 +9,6 @@ import './App.css'
 // Single localStorage key used to persist the app state in the browser.
 const STORAGE_KEY = 'newton-data'
 
-// Builds the list of day "columns" shown in Horizon.
-// Right now it's a fixed range (Feb 5 -> Mar 15 of the current year).
-function getDateRange() { //creates an array of dates from Feb 5 to May 31 of the current year.
-  const year = new Date().getFullYear()
-  const start = new Date(year, 0, 5)   // Feb 5(1 is February, 5 is the day)
-  const end = new Date(year, 4, 31)    // May 31 (4 is May)
-
-  const dates = []
-  const d = new Date(start)
-  while (d <= end) {
-    dates.push(new Date(d))
-    d.setDate(d.getDate() + 1)
-  }
-  return dates
-}
-
 // Converts a Date object into a stable string key like "2026-02-25".
 // We use this as the dictionary key for tasks-per-day.
 function dateToKey(date) {
@@ -33,20 +17,14 @@ function dateToKey(date) {
 
 // Reads tasks from localStorage and returns a dictionary:
 // { "YYYY-MM-DD": [task, task, ...], ... }
-// If a day doesn't exist in storage yet, we default it to an empty array.
-function loadTasks(dates) {
+function loadTasks() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (!saved) 
-      return null; //If there’s no saved data, return null.
+    if (!saved) return null
     const data = JSON.parse(saved)
-    const days = data.days ?? {}
-    const result = {}
-    dates.forEach((d) => {
-      const key = dateToKey(d)
-      result[key] = days[key] ?? []
-    })
-    return result
+    // Keep all saved days so the infinite timeline can show tasks
+    // even when it expands outside the originally rendered window.
+    return data.days ?? {}
   } catch {
     return null
   }
@@ -109,12 +87,9 @@ function App() {
   // Which panel is visible (controlled by the sidebar).
   const [activePanel, setActivePanel] = useState('horizon')
 
-  // Horizon's date columns. Stored once so it doesn't rebuild on every render.
-  const [dates] = useState(getDateRange)
-
   // Tasks are stored as a dictionary keyed by date (YYYY-MM-DD).
   const [tasksByDate, setTasksByDate] = useState(() => {
-    const loaded = loadTasks(dates)
+    const loaded = loadTasks()
     return loaded ?? {}
   })
 
@@ -244,7 +219,6 @@ function App() {
         {/* Horizon: main task timeline view */}
         {activePanel === 'horizon' && (
           <HorizonPanel
-            dates={dates}
             tasksByDate={tasksByDate}
             onAddTask={handleAddTask}
             onToggleTask={handleToggleTask}
