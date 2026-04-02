@@ -159,6 +159,23 @@ single isolated action, these logs create a continuous record of how a user beha
  repeated edits may suggest uncertainty or shifting priorities. By collecting this information about the user, Newton is able to go 
  beyond simple tracking and begin identifying behavioral patterns. This provides a foundation for generating reflective insights for
   users to better understand how they perform over time.
+
+
+To turn raw activity logs into meaningful insights, Newton uses a large language model to interpret the behavior. The system
+ provides the model with the change logs and a prompt that frames the task as reflective rather than directive. The prompt 
+ encourages the model to analyze the patterns in the behavior of the user, along with inconsistencies and trends. Depending on 
+ the implementation, this model may be deployed locally or accessed through an external API, with each option presenting trade-offs
+  in terms of privacy, cost, and performance. Instead of just summarizing the data, the goal is to help the user be more aware of 
+  their workflow and behavioral trends, such as overcommitment, delays in task completion, and shifts in priorities.
+
+
+The output is shown to the user in the form of structured feedback, organized as bullet points for readability. The insights are 
+personalized and are directly related to the user's recent activity on Newton, making them more relevant. For instance, the system 
+might highlight uneven workload distribution across the week, or inconsistencies between the stated goals and the accomplished goals. 
+The system intentionally avoids giving instructions, instead providing reflective feedback that encourages the user to interpret and 
+respond based on their own judgement. This reinforces the role of Newton as a cognitive supporter rather than augmenter. By 
+presenting the feedback in a clear format, we help the user to quickly grasp the patterns in their behavior, avoiding the need for 
+manual analysis.
 \section{Conclusion}
 
 \bibliographystyle{acm}
