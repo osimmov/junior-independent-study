@@ -11,7 +11,7 @@ const STORAGE_KEY = 'newton-data'
 
 // Builds the list of day "columns" shown in Horizon.
 // Right now it's a fixed range (Feb 5 -> Mar 15 of the current year).
-function getDateRange() {
+function getDateRange() { //creates an array of dates from Feb 5 to May 31 of the current year.
   const year = new Date().getFullYear()
   const start = new Date(year, 0, 5)   // Feb 5(1 is February, 5 is the day)
   const end = new Date(year, 4, 31)    // May 31 (4 is May)
@@ -132,6 +132,7 @@ function App() {
     saveToStorage(tasksByDate, activities)
   }, [tasksByDate, activities])
 
+  //Adding a task to a certain day
   // Adds a task to a specific date.
   const handleAddTask = useCallback((dateKey, text) => {
     setTasksByDate((prev) => {
