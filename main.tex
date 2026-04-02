@@ -178,7 +178,14 @@ presenting the feedback in a clear format, we help the user to quickly grasp the
 manual analysis.
 
 \section{Implementation}
-Newton is built as a web-application that combines the UI with the AI analysis tool. The interface design of Newton is inspired by 
+Newton is built as a web-application that combines the UI with the AI analysis tool. The system collects and stores user 
+interactions locally using browser storage. Actions such as creating, editing, completing, or rescheduling tasks are recorded and 
+used as the primary data source. When enough activity is collected, it is passed to a language model, which identifies patterns and 
+generates reflective feedback. This creates a straightforward pipeline: raw interaction data is logged, analyzed, and returned to 
+the user as meaningful insights.
+
+
+The interface design of Newton is inspired by 
 the Timestripe productivity application, infinite horizontal timeline feature in particular. Users can scroll infinitely to the left 
 to view past days and to the right to plan future tasks, with each day represented as a column. Tasks are organized within these day
  columns, allowing users to visually structure their workflow over time. The application is composed of several key components,
