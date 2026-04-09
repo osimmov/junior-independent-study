@@ -221,6 +221,53 @@ for generating insights \ref{fig:insight}. This design choice introduces flexibi
  rigid format, but instead adapted to individual preferences and needs. By allowing users to shape how the AI interprets their data,
   Newton moves closer to a personalized cognitive support system
 
+  Newton also includes a dedicated AI Insights panel \ref{fig:reflection} that functions as a conversational interface. Unlike the column-based insights,
+   which are tied to a specific time window, this panel has access to the full activity history of the user. It allows users to ask 
+   open-ended questions about their productivity, such as comparing performance across weeks or identifying trends over longer
+    periods. The system constructs a summarized activity log from recorded events and provides it to the language model along with 
+    the ongoing conversation. This enables more dynamic and context-aware interactions, where users can explore their behavior
+    through iterative questioning. The chat-based interface transforms reflection from a passive experience into an interactive 
+    process, allowing users to actively engage with their data rather than simply receiving static feedback.
+
+
+Newton also introduce more flexible task management features, such as drag-and-drop reordering and cross-column movement. Users can 
+rearrange tasks within a column to reflect changing priorities, or move tasks across different days and time frames. Additionally,
+ incomplete tasks are automatically carried over to the next day, ensuring continuity in planning. While these features primarily
+  improve usability, they also provide additional behavioral signals for analysis. For example, frequent reordering may indicate 
+  shifting priorities, while repeated carryover of tasks may highlight overcommitment or unrealistic planning. By capturing these
+   interactions, the system gains a more nuanced understanding of user behavior beyond simple task completion.
+
+
+\subsection{The model}
+The current implementation uses locally deployed language models, including DeepSeek 7B and the Gemma model family. These models are
+ particularly effective for reasoning tasks, as they are designed to handle structured input and generate coherent, step-by-step
+  interpretations. In the context of Newton, this makes them well-suited for identifying behavioral patterns within activity logs,
+   such as recurring delays, uneven workload distribution, or inconsistencies between goals and actions. Their ability to process 
+   sequences of events and generate natural language explanations allows the system to translate raw data into meaningful insights. 
+   Running the models locally also provides advantages in terms of privacy and control, as user data does not need to be sent to 
+   external servers. However, this comes at the cost of increased latency, with response times ranging from one to several minutes.
+
+
+\section{Results}
+The current version of Newton demonstrates that it is possible to transform raw productivity data into meaningful reflective 
+feedback using AI. In practical use, the system is able to identify patterns such as frequent task rescheduling, uneven workload
+ distribution across days, and gaps between planned and completed tasks. These insights are presented in a concise and structured 
+ format, making them easy for users to interpret. Early informal testing suggests that users are able to recognize aspects of their
+  behavior that were previously unnoticed, particularly in relation to overcommitment and shifting priorities.
+
+The introduction of multi-scale insights further improves the usefulness of the system. By allowing users to generate feedback at 
+the level of a day, week, or month, Newton supports both short-term and long-term reflection. Users can observe how daily habits 
+accumulate into broader patterns over time. Additionally, the conversational AI interface enables more flexible exploration of
+ productivity data. Instead of relying solely on predefined insights, users can ask targeted questions and receive context-aware 
+ responses based on their activity history. Together, these features demonstrate the potential of combining structured data logging
+  with AI-driven interpretation.
+
+
+\section{Analysis and Discussion}
+
+
+
+\section{Conclusion}
 
 
 
@@ -252,13 +299,7 @@ for generating insights \ref{fig:insight}. This design choice introduces flexibi
   \label{fig:insight}
 \end{figure}
 
-\section{Results}
-(Testing the platform with real users, around ~10 people who use a task manager on a daily basis, and ask for their opinion 
-about the usefulness of the software. Need HSRC approval)
 
-\section{Analysis and Discussion}
-
-\section{Conclusion}
 
 \bibliographystyle{acm}
 \bibliography{bibliography.bib}
