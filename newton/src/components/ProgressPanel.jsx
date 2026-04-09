@@ -35,12 +35,12 @@ function ProgressPanel({ activities }) {
   const getIcon = (type) => {
     if (type === 'created') {
       return (
-        <span className="text-amber-400 mr-2">*</span>
+        <span className="text-newton-today mr-2">*</span>
       )
     }
     if (type === 'edited') {
       return (
-        <svg className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 text-newton-muted mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
         </svg>
       )
@@ -64,7 +64,11 @@ function ProgressPanel({ activities }) {
 
   // Turns an activity record into a readable sentence.
   const getDescription = (a) => {
-    const name = <span className="bg-gray-700/50 px-1 rounded text-gray-200">{a.taskName}</span>
+    const name = (
+      <span className="bg-newton-surface px-1 rounded border border-newton-border/60 text-newton-text">
+        {a.taskName}
+      </span>
+    )
     if (a.type === 'created') return <>{name} was created</>
     if (a.type === 'edited') return <>{name} was edited</>
     if (a.type === 'deleted') return <>{name} was deleted</>
@@ -72,36 +76,28 @@ function ProgressPanel({ activities }) {
     return a.description
   }
 
-  // Header-only UI: display the range "start of this month — Today".
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setMonth(startOfMonth.getMonth())
-  const rangeStart = startOfMonth.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const rangeEnd = 'Today'
-
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <h1 className="text-xl font-bold text-white mb-1">Progress</h1>
-      <div className="flex items-center gap-2 text-gray-500 text-sm mb-6">
+    <div className="flex-1 overflow-y-auto p-6 bg-newton-charcoal min-h-0">
+      <h1 className="text-xl font-bold text-newton-text mb-1">Progress</h1>
+      <div className="flex items-center gap-2 text-newton-muted text-sm mb-6">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        {/* <span>{rangeStart} — {rangeEnd}</span> */}
       </div>
 
       {dates.length === 0 ? (
-        <p className="text-gray-500 text-sm">No activity yet.</p>
+        <p className="text-newton-muted text-sm">No activity yet.</p>
       ) : (
         dates.map((dateKey) => (
           <div key={dateKey} className="mb-6">
-            <h2 className="text-gray-400 font-medium mb-2">{formatDate(dateKey)}</h2>
-            <hr className="border-gray-800 mb-3" />
+            <h2 className="text-newton-muted font-medium mb-2">{formatDate(dateKey)}</h2>
+            <hr className="border-newton-border mb-3" />
             <ul className="space-y-2">
               {byDate[dateKey]
                 // Sort within a day by time (HH:MM), latest first.
                 .sort((a, b) => b.time.localeCompare(a.time))
                 .map((a) => (
-                  <li key={a.id} className="flex items-center text-sm text-gray-400">
+                  <li key={a.id} className="flex items-center text-sm text-newton-muted">
                     {getIcon(a.type)}
                     <span className="mr-2">{formatTime(a.time)}</span>
                     {getDescription(a)}

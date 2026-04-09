@@ -1,0 +1,21 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      colors: {
+        newton: {
+          charcoal: '#1a1a1c',
+          surface: '#252528',
+          border: '#3a3a3e',
+          muted: '#9ca3af',
+          text: '#e5e7eb',
+          accent: '#6b7280',
+          today: '#e07c4c',
+        },
+      },
+    },
+  },
+}

@@ -1,215 +1,256 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import DayColumn from './DayColumn'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import HorizonGrainStrip from './HorizonGrainStrip'
+import {
+  addLocalDays,
+  dayColumnLabel,
+  dayIdToLocalDate,
+  enumerateDayIds,
+  enumerateMonthIds,
+  enumerateWeekIds,
+  enumerateYearIds,
+  isoWeekIdFromLocalDate,
+  localDateToDayId,
+  localDateToMonthId,
+  localDateToYearId,
+  monthIdLabel,
+  startOfIsoWeekMonday,
+  weekIdLabel,
+} from '../lib/horizonDates.js'
 
-// Horizon = the main timeline view (infinite horizontal date scrolling).
-// - Maintains a finite date window: [windowStart..windowEnd]
-// - Expands the window as you scroll near the left/right edges
-// - Uses fixed-width columns so we can compensate scroll position when prepending.
+const WINDOWS_STORAGE_KEY = 'newton-horizon-windows-v1'
 
-const COLUMN_WIDTH = 280 //px (must match DayColumn's fixed width)
-const WINDOW_SIZE = 30 //days on each side of today initially
-const EXPAND_DAYS = 14 //days to add when the user hits an edge
-const EDGE_THRESHOLD = 120 //px from either edge to trigger expansion
-const DATE_WINDOW_STORAGE_KEY = 'newton-date-window-v1'
+const GRAINS = [
+  { id: 'day', label: 'Days' },
+  { id: 'week', label: 'Weeks' },
+  { id: 'month', label: 'Months' },
+  { id: 'year', label: 'Years' },
+]
 
-function toLocalMidnight(d) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+function toLocalDate(dayId) {
+  return dayIdToLocalDate(dayId)
 }
 
-function addLocalDays(d, days) {
-  const next = new Date(d)
-  next.setDate(next.getDate() + days)
-  return next
-}
-
-function localDateToKey(d) {
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}` // "YYYY-MM-DD"
-}
-
-function localKeyToDate(key) {
-  // Interpret the saved YYYY-MM-DD as local midnight.
-  return new Date(`${key}T00:00:00`)
-}
-
-function loadDateWindow() {
+function loadWindows() {
   try {
-    const raw = localStorage.getItem(DATE_WINDOW_STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed?.start || !parsed?.end) return null
-    return { start: parsed.start, end: parsed.end }
+    const raw = localStorage.getItem(WINDOWS_STORAGE_KEY)
+    if (raw) {
+      const p = JSON.parse(raw)
+      if (p?.day?.start && p?.day?.end) return p
+    }
   } catch {
-    return null
+    // ignore
+  }
+
+  const today = new Date()
+
+  const dayStart = addLocalDays(new Date(today.getFullYear(), today.getMonth(), today.getDate()), -30)
+  const dayEnd = addLocalDays(new Date(today.getFullYear(), today.getMonth(), today.getDate()), 30)
+
+  const wkStart = startOfIsoWeekMonday(addLocalDays(today, -84))
+  const wkEnd = addLocalDays(today, 84)
+
+  const moStart = new Date(today.getFullYear(), today.getMonth() - 6, 1)
+  const moEnd = new Date(today.getFullYear(), today.getMonth() + 18, 0)
+
+  const y = today.getFullYear()
+  const yrStart = new Date(y - 2, 0, 1)
+  const yrEnd = new Date(y + 2, 11, 31)
+
+  return {
+    day: { start: localDateToDayId(dayStart), end: localDateToDayId(dayEnd) },
+    week: { start: localDateToDayId(wkStart), end: localDateToDayId(wkEnd) },
+    month: { start: localDateToDayId(moStart), end: localDateToDayId(moEnd) },
+    year: { start: localDateToDayId(yrStart), end: localDateToDayId(yrEnd) },
   }
 }
 
-function saveDateWindow(start, end) {
+function saveWindows(w) {
   try {
-    localStorage.setItem(
-      DATE_WINDOW_STORAGE_KEY,
-      JSON.stringify({ start: localDateToKey(start), end: localDateToKey(end) })
-    )
+    localStorage.setItem(WINDOWS_STORAGE_KEY, JSON.stringify(w))
   } catch {
-    // Ignore write errors (e.g. privacy mode).
+    // ignore
   }
 }
 
-function HorizonPanel({ tasksByDate, onAddTask, onToggleTask, onEditTask, onDeleteTask, onOpenTask }) {
-  const containerRef = useRef(null)
+function HorizonPanel({
+  tasks,
+  onAddTask,
+  onToggleTask,
+  onEditTask,
+  onDeleteTask,
+  onOpenTask,
+  onTasksDragEnd,
+}) {
+  const [grain, setGrain] = useState('day')
+  const [windows, setWindows] = useState(() => loadWindows())
+  const scrollRef = useRef(null)
 
-  // When we prepend columns on the left, the user's viewport would "jump".
-  // We compensate after the DOM updates by adding to scrollLeft.
-  const justExpandedLeft = useRef(false)
-
-  // Ensure the "scroll to today" runs only once per mount.
-  const didInitialScroll = useRef(false)
-
-  const getInitialWindow = useCallback(() => {
-    const today = toLocalMidnight(new Date())
-    const saved = loadDateWindow()
-
-    if (saved?.start && saved?.end) {
-      const savedStart = localKeyToDate(saved.start)
-      const savedEnd = localKeyToDate(saved.end)
-
-      // Sanity check ordering and whether it includes today.
-      if (savedStart <= savedEnd && today >= savedStart && today <= savedEnd) {
-        return { start: savedStart, end: savedEnd }
-      }
-    }
-
-    return {
-      start: addLocalDays(today, -WINDOW_SIZE),
-      end: addLocalDays(today, WINDOW_SIZE),
-    }
-  }, [])
-
-  const initial = useMemo(() => getInitialWindow(), [getInitialWindow])
-  const [windowStart, setWindowStart] = useState(initial.start)
-  const [windowEnd, setWindowEnd] = useState(initial.end)
-
-  // Persist the date window whenever it changes (so view switching / remounting keeps it).
   useEffect(() => {
-    saveDateWindow(windowStart, windowEnd)
-  }, [windowStart, windowEnd])
+    saveWindows(windows)
+  }, [windows])
 
-  // Scroll helper used when the user presses the "Today" button.
-  const scrollToToday = useCallback(() => {
-    const todayEl = containerRef.current?.querySelector('[data-today]')
-    if (todayEl) {
-      todayEl.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
-    }
-  }, [])
+  const range = windows[grain]
+  const windowStart = useMemo(() => toLocalDate(range.start), [range.start])
+  const windowEnd = useMemo(() => toLocalDate(range.end), [range.end])
 
   const expandLeft = useCallback(() => {
-    justExpandedLeft.current = true
-    setWindowStart((prev) => addLocalDays(prev, -EXPAND_DAYS))
-  }, [])
+    setWindows((prev) => {
+      const r = prev[grain]
+      const ws = toLocalDate(r.start)
+      const we = toLocalDate(r.end)
+      let ns = ws
+      let ne = we
+      if (grain === 'day') {
+        ns = addLocalDays(ws, -14)
+      } else if (grain === 'week') {
+        ns = addLocalDays(ws, -28)
+      } else if (grain === 'month') {
+        ns = new Date(ws.getFullYear(), ws.getMonth() - 3, 1)
+      } else {
+        ns = new Date(ws.getFullYear() - 2, 0, 1)
+      }
+      return { ...prev, [grain]: { start: localDateToDayId(ns), end: localDateToDayId(ne) } }
+    })
+  }, [grain])
 
   const expandRight = useCallback(() => {
-    setWindowEnd((prev) => addLocalDays(prev, EXPAND_DAYS))
+    setWindows((prev) => {
+      const r = prev[grain]
+      const ws = toLocalDate(r.start)
+      const we = toLocalDate(r.end)
+      let ns = ws
+      let ne = we
+      if (grain === 'day') {
+        ne = addLocalDays(we, 14)
+      } else if (grain === 'week') {
+        ne = addLocalDays(we, 28)
+      } else if (grain === 'month') {
+        ne = new Date(we.getFullYear(), we.getMonth() + 4, 0)
+      } else {
+        ne = new Date(we.getFullYear() + 2, 11, 31)
+      }
+      return { ...prev, [grain]: { start: localDateToDayId(ns), end: localDateToDayId(ne) } }
+    })
+  }, [grain])
+
+  const today = new Date()
+  const todayDayId = localDateToDayId(today)
+  const todayWeekId = isoWeekIdFromLocalDate(today)
+  const todayMonthId = localDateToMonthId(today)
+  const todayYearId = localDateToYearId(today)
+
+  const columnIds = useMemo(() => {
+    if (grain === 'day') return enumerateDayIds(windowStart, windowEnd)
+    if (grain === 'week') return enumerateWeekIds(windowStart, windowEnd)
+    if (grain === 'month') return enumerateMonthIds(windowStart, windowEnd)
+    return enumerateYearIds(windowStart, windowEnd)
+  }, [grain, windowStart, windowEnd])
+
+  const columnSpecs = useMemo(() => {
+    return columnIds.map((id) => {
+      let title = id
+      let subtitle = ''
+      let isCurrent = false
+
+      if (grain === 'day') {
+        const { title: t, subtitle: s } = dayColumnLabel(id)
+        title = t
+        subtitle = s
+        isCurrent = id === todayDayId
+      } else if (grain === 'week') {
+        title = weekIdLabel(id)
+        subtitle = id
+        isCurrent = id === todayWeekId
+      } else if (grain === 'month') {
+        title = monthIdLabel(id)
+        subtitle = id
+        isCurrent = id === todayMonthId
+      } else {
+        title = id
+        subtitle = 'Year'
+        isCurrent = id === todayYearId
+      }
+
+      return {
+        id,
+        title,
+        subtitle,
+        isCurrent,
+        onAddTask: (text) => onAddTask(grain, id, text),
+        onToggleTask,
+        onEditTask,
+        onDeleteTask,
+        onOpenTask,
+      }
+    })
+  }, [
+    columnIds,
+    grain,
+    todayDayId,
+    todayWeekId,
+    todayMonthId,
+    todayYearId,
+    onAddTask,
+    onToggleTask,
+    onEditTask,
+    onDeleteTask,
+    onOpenTask,
+  ])
+
+  const leftAnchorKey = columnSpecs[0]?.id
+
+  const jumpLabels = {
+    day: 'Today',
+    week: 'This week',
+    month: 'This month',
+    year: 'This year',
+  }
+
+  const scrollToCurrent = useCallback(() => {
+    const root = scrollRef.current
+    const el = root?.querySelector?.('[data-current-bucket]')
+    if (el) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
   }, [])
 
-  const dates = useMemo(() => {
-    const out = []
-    const d = new Date(windowStart)
-    // Inclusive window: start..end.
-    while (d <= windowEnd) {
-      out.push(new Date(d))
-      d.setDate(d.getDate() + 1)
-    }
-    return out
-  }, [windowStart, windowEnd])
-
-  // After prepending (windowStart changes), compensate scroll position so the viewport stays stable.
-  useLayoutEffect(() => {
-    if (!justExpandedLeft.current) return
-    const el = containerRef.current
-    if (!el) return
-
-    el.scrollLeft += EXPAND_DAYS * COLUMN_WIDTH
-    justExpandedLeft.current = false
-  }, [windowStart])
-
-  // Initial scroll to today (only once).
-  useLayoutEffect(() => {
-    if (didInitialScroll.current) return
-    const el = containerRef.current
-    if (!el) return
-
-    const today = toLocalMidnight(new Date())
-    const todayIndex = dates.findIndex((d) => localDateToKey(d) === localDateToKey(today))
-    if (todayIndex < 0) return
-
-    // Center the "today" column when possible.
-    const centerOffset = el.clientWidth / 2 - COLUMN_WIDTH / 2
-    el.scrollLeft = Math.max(0, todayIndex * COLUMN_WIDTH - centerOffset)
-    didInitialScroll.current = true
-  }, [dates])
-
-  // Edge-trigger expansion on scroll.
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-
-    const onScroll = () => {
-      const maxScroll = el.scrollWidth - el.clientWidth
-      if (maxScroll <= 0) return
-
-      const hitLeft = el.scrollLeft < EDGE_THRESHOLD
-      const hitRight = el.scrollLeft > maxScroll - EDGE_THRESHOLD
-
-      if (hitLeft) expandLeft()
-      else if (hitRight) expandRight()
-    }
-
-    el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
-  }, [expandLeft, expandRight])
-
-  const todayStr = new Date().toDateString()
-
   return (
-    <>
-      {/* Horizontally scrollable row of fixed-width day columns */}
-      <div
-        ref={containerRef}
-        className="flex flex-1 overflow-x-scroll overflow-y-hidden min-h-0 min-w-0"
-      >
-        {dates.map((date) => {
-          const dateKey = date.toISOString().slice(0, 10)
-          const isToday = date.toDateString() === todayStr
-
-          return (
-            <DayColumn
-              key={dateKey}
-              dateKey={dateKey}
-              date={date}
-              columnWidth={COLUMN_WIDTH}
-              tasks={tasksByDate[dateKey] ?? []}
-              isToday={isToday}
-              onAddTask={onAddTask}
-              onToggleTask={(taskId) => onToggleTask(dateKey, taskId)}
-              onEditTask={(taskId, text, oldText) => onEditTask(dateKey, taskId, text, oldText)}
-              onDeleteTask={(taskId) => onDeleteTask(dateKey, taskId)}
-              onOpenTask={(taskId) => onOpenTask(dateKey, taskId)}
-            />
-          )
-        })}
+    <div className="flex flex-col flex-1 min-h-0 min-w-0">
+      <div className="flex items-center gap-1 px-4 pt-3 pb-2 border-b border-newton-border shrink-0">
+        {GRAINS.map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() => setGrain(g.id)}
+            className={`px-3 py-1.5 rounded-lg text-sm transition-colors border ${
+              grain === g.id
+                ? 'bg-newton-surface text-newton-text border-newton-border'
+                : 'border-transparent text-newton-muted hover:text-newton-text hover:bg-white/5'
+            }`}
+          >
+            {g.label}
+          </button>
+        ))}
       </div>
 
-      {/* Today button to scroll to today's column */}
+      <HorizonGrainStrip
+        key={grain}
+        ref={scrollRef}
+        grain={grain}
+        columnSpecs={columnSpecs}
+        tasks={tasks}
+        onTasksDragEnd={onTasksDragEnd}
+        leftAnchorKey={leftAnchorKey}
+        onExpandLeft={expandLeft}
+        onExpandRight={expandRight}
+      />
+
       <button
         type="button"
-        onClick={scrollToToday}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm transition-colors z-10"
+        onClick={scrollToCurrent}
+        className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-newton-surface hover:bg-newton-border border border-newton-border text-newton-text rounded-lg text-sm transition-colors z-10"
       >
-        Today
+        {jumpLabels[grain]}
       </button>
-    </>
+    </div>
   )
 }
 

@@ -1,247 +1,286 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { arrayMove } from '@dnd-kit/sortable'
 import Sidebar from './components/Sidebar'
 import HorizonPanel from './components/HorizonPanel'
 import ProgressPanel from './components/ProgressPanel'
 import AIInsightsPanel from './components/AIInsightsPanel'
 import TaskModal from './components/TaskModal'
+import { BucketInsightsProvider } from './contexts/BucketInsightsContext.jsx'
+import { sendProductivityChatMessage } from './services/ollamaReflections'
+import {
+  createTaskInBucket,
+  mapWithNewOrders,
+  migrateTasksFromStorage,
+  parseContainerId,
+  taskContainerId,
+  tasksInBucket,
+  withBucketGrain,
+} from './lib/tasks.js'
 import './App.css'
 
-// Single localStorage key used to persist the app state in the browser.
 const STORAGE_KEY = 'newton-data'
 
-// Converts a Date object into a stable string key like "2026-02-25".
-// We use this as the dictionary key for tasks-per-day.
-function dateToKey(date) {
-  return date.toISOString().slice(0, 10)
-}
-
-// Reads tasks from localStorage and returns a dictionary:
-// { "YYYY-MM-DD": [task, task, ...], ... }
-function loadTasks() {
+function loadAppData() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    if (!saved) return null
+    if (!saved) return { tasks: [], activities: [] }
     const data = JSON.parse(saved)
-    // Keep all saved days so the infinite timeline can show tasks
-    // even when it expands outside the originally rendered window.
-    return data.days ?? {}
+    const tasks = migrateTasksFromStorage(data).filter((t) => taskContainerId(t))
+    return {
+      tasks,
+      activities: Array.isArray(data.activities) ? data.activities : [],
+    }
   } catch {
-    return null
+    return { tasks: [], activities: [] }
   }
 }
 
-// Reads the progress/activity log from localStorage.
-function loadActivities() {
+function saveAppData(tasks, activities) {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (!saved) return null
-    const data = JSON.parse(saved)
-    return data.activities ?? null
-  } catch {
-    return null
-  }
-}
-
-// Persists tasks + activity log to localStorage.
-// We merge tasksByDate into any existing stored "days" so previously saved
-// dates don't get wiped out if they're not currently rendered.
-function saveToStorage(tasksByDate, activities) {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    const data = saved ? JSON.parse(saved) : { days: {}, activities: [] }
-    data.days = data.days ?? {}
-    Object.assign(data.days, tasksByDate)
-    data.activities = activities
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, tasks, activities }))
   } catch (e) {
     console.error('Failed to save to localStorage:', e)
   }
 }
 
-// Creates a single task object.
-function createTask(text) {
-  return {
-    id: crypto.randomUUID(),
-    text,
-    description: '',
-    completed: false,
-  }
-}
-
 function addActivity(activities, type, taskName) {
   const now = new Date()
-  // Use the user's local calendar date (YYYY-MM-DD) instead of UTC,
-  // so activity entries appear under the expected "today" in ProgressPanel.
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
   const date = `${year}-${month}-${day}`
   const time = now.toTimeString().slice(0, 5)
-  return [
-    { id: crypto.randomUUID(), date, time, type, taskName },
-    ...activities,
-  ]
+  return [{ id: crypto.randomUUID(), date, time, type, taskName }, ...activities]
 }
 
 function App() {
-  // Which panel is visible (controlled by the sidebar).
+  const initial = loadAppData()
   const [activePanel, setActivePanel] = useState('horizon')
+  const [tasks, setTasks] = useState(initial.tasks)
+  const [activities, setActivities] = useState(initial.activities)
+  const [modalTaskId, setModalTaskId] = useState(null)
 
-  // Tasks are stored as a dictionary keyed by date (YYYY-MM-DD).
-  const [tasksByDate, setTasksByDate] = useState(() => {
-    const loaded = loadTasks()
-    return loaded ?? {}
-  })
+  const [insightMessages, setInsightMessages] = useState([])
+  const [insightError, setInsightError] = useState(null)
+  const [insightLoading, setInsightLoading] = useState(false)
+  const insightRequestId = useRef(0)
 
-  // Activity history shown in the Progress panel.
-  const [activities, setActivities] = useState(() => {
-    const loaded = loadActivities()
-    return loaded ?? []
-  })
-
-  // When set, the TaskModal is visible for a specific task (identified by dateKey + taskId).
-  const [modalTaskRef, setModalTaskRef] = useState(null)
-
-  // Save whenever tasks or activities change.
   useEffect(() => {
-    saveToStorage(tasksByDate, activities)
-  }, [tasksByDate, activities])
+    saveAppData(tasks, activities)
+  }, [tasks, activities])
 
-  //Adding a task to a certain day
-  // Adds a task to a specific date.
-  const handleAddTask = useCallback((dateKey, text) => {
-    setTasksByDate((prev) => {
-      const dayTasks = prev[dateKey] ?? []
-      return { ...prev, [dateKey]: [...dayTasks, createTask(text)] }
-    })
+  const handleSendInsightMessage = useCallback(
+    async (text) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+      const userMsg = { id: crypto.randomUUID(), role: 'user', content: trimmed }
+      const requestId = ++insightRequestId.current
+      setInsightError(null)
+
+      let snapshotForApi
+      setInsightMessages((prev) => {
+        snapshotForApi = [...prev, userMsg].map(({ role, content }) => ({ role, content }))
+        return [...prev, userMsg]
+      })
+
+      setInsightLoading(true)
+      try {
+        const reply = await sendProductivityChatMessage(activities, snapshotForApi)
+        if (requestId !== insightRequestId.current) return
+        setInsightMessages((prev) => [
+          ...prev,
+          { id: crypto.randomUUID(), role: 'assistant', content: reply },
+        ])
+      } catch (e) {
+        if (requestId !== insightRequestId.current) return
+        setInsightError(e?.message ?? 'Something went wrong.')
+      } finally {
+        if (requestId === insightRequestId.current) {
+          setInsightLoading(false)
+        }
+      }
+    },
+    [activities]
+  )
+
+  const handleAddTask = useCallback((grain, bucketId, text) => {
+    setTasks((prev) => [...prev, createTaskInBucket(text, grain, bucketId, prev)])
     setActivities((prev) => addActivity(prev, 'created', text))
   }, [])
 
-  // Toggles a task complete/incomplete.
-  // We log an activity only when a task becomes completed (not when unchecking).
-  const handleToggleTask = useCallback((dateKey, taskId) => {
-    const dayTasks = tasksByDate[dateKey] ?? []
-    const task = dayTasks.find((t) => t.id === taskId)
-    const taskName = task?.text ?? ''
-    const wasCompleted = task?.completed ?? false
-
-    setTasksByDate((prev) => {
-      const dayTasks = prev[dateKey] ?? []
-      return {
-        ...prev,
-        [dateKey]: dayTasks.map((t) =>
-          t.id === taskId ? { ...t, completed: !t.completed } : t
-        ),
+  const handleToggleTask = useCallback((taskId) => {
+    setTasks((prev) => {
+      const task = prev.find((t) => t.id === taskId)
+      if (!task) return prev
+      const wasCompleted = task.completed
+      const taskName = task.text ?? ''
+      if (taskName && !wasCompleted) {
+        setActivities((a) => addActivity(a, 'completed', taskName))
       }
+      return prev.map((t) => (t.id === taskId ? { ...t, completed: !t.completed } : t))
     })
-    if (taskName && !wasCompleted) {
-      setActivities((prev) => addActivity(prev, 'completed', taskName))
-    }
-  }, [tasksByDate])
+  }, [])
 
-  // Updates a task's text.
-  // The Progress log uses oldText (when available) so you can see what was renamed.
-  const handleEditTask = useCallback((dateKey, taskId, newText, oldText) => {
-    setTasksByDate((prev) => {
-      const dayTasks = prev[dateKey] ?? []
-      return {
-        ...prev,
-        [dateKey]: dayTasks.map((t) =>
-          t.id === taskId ? { ...t, text: newText } : t
-        ),
-      }
-    })
+  const handleEditTask = useCallback((taskId, newText, oldText) => {
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t)))
     setActivities((prev) => addActivity(prev, 'edited', oldText || newText))
   }, [])
 
-  // Deletes a task from a given date.
-  const handleDeleteTask = useCallback((dateKey, taskId) => {
-    const dayTasks = tasksByDate[dateKey] ?? []
-    const task = dayTasks.find((t) => t.id === taskId)
-    const taskName = task?.text ?? ''
-
-    setTasksByDate((prev) => {
-      const dayTasks = prev[dateKey] ?? []
-      return { ...prev, [dateKey]: dayTasks.filter((t) => t.id !== taskId) }
-    })
-    if (taskName) {
-      setActivities((prev) => addActivity(prev, 'deleted', taskName))
-    }
-  }, [tasksByDate])
-
-  // Opens the modal for a particular task.
-  const openTaskModal = useCallback((dateKey, taskId) => {
-    setModalTaskRef({ dateKey, taskId })
-  }, [])
-
-  // Closes the modal (saving is handled by the modal before it calls this).
-  const closeTaskModal = useCallback(() => {
-    setModalTaskRef(null)
-  }, [])
-
-  // Applies a partial update to a task (title and/or description) and logs a single edit activity.
-  const handleModalSave = useCallback((dateKey, taskId, patch, meta) => {
-    const dayTasks = tasksByDate[dateKey] ?? []
-    const task = dayTasks.find((t) => t.id === taskId)
-    if (!task) return
-
-    const nextText = patch.text ?? task.text
-    const nextDescription = patch.description ?? (task.description ?? '')
-
-    const textChanged = nextText !== task.text
-    const descriptionChanged = nextDescription !== (task.description ?? '')
-    if (!textChanged && !descriptionChanged) return
-
-    setTasksByDate((prev) => {
-      const dayTasks = prev[dateKey] ?? []
-      return {
-        ...prev,
-        [dateKey]: dayTasks.map((t) =>
-          t.id === taskId ? { ...t, ...patch } : t
-        ),
+  const handleDeleteTask = useCallback((taskId) => {
+    setTasks((prev) => {
+      const task = prev.find((t) => t.id === taskId)
+      const taskName = task?.text ?? ''
+      if (taskName) {
+        setActivities((a) => addActivity(a, 'deleted', taskName))
       }
+      return prev.filter((t) => t.id !== taskId)
     })
-    setActivities((prev) => addActivity(prev, 'edited', meta?.oldText || task.text))
-  }, [tasksByDate])
+  }, [])
 
-  // Resolve the currently open modal task from state.
-  const modalTask = (() => {
-    if (!modalTaskRef) return null
-    const dayTasks = tasksByDate[modalTaskRef.dateKey] ?? []
-    return dayTasks.find((t) => t.id === modalTaskRef.taskId) ?? null
-  })()
+  const openTaskModal = useCallback((taskId) => {
+    setModalTaskId(taskId)
+  }, [])
+
+  const closeTaskModal = useCallback(() => {
+    setModalTaskId(null)
+  }, [])
+
+  const handleModalSave = useCallback((taskId, patch, meta) => {
+    setTasks((prev) => {
+      const task = prev.find((t) => t.id === taskId)
+      if (!task) return prev
+      const nextText = patch.text ?? task.text
+      const nextDescription = patch.description ?? (task.description ?? '')
+      const textChanged = nextText !== task.text
+      const descriptionChanged = nextDescription !== (task.description ?? '')
+      if (!textChanged && !descriptionChanged) return prev
+      setActivities((a) => addActivity(a, 'edited', meta?.oldText || task.text))
+      return prev.map((t) => (t.id === taskId ? { ...t, ...patch } : t))
+    })
+  }, [])
+
+  const handleHorizonDragEnd = useCallback((grain, event) => {
+    const { active, over } = event
+    if (!over) return
+
+    const activeId = String(active.id)
+    const overId = String(over.id)
+    if (activeId === overId) return
+
+    setTasks((tasksBefore) => {
+      const activeTask = tasksBefore.find((t) => t.id === activeId)
+      if (!activeTask) return tasksBefore
+
+      const source = taskContainerId(activeTask)
+      if (!source || !source.startsWith(`${grain}:`)) return tasksBefore
+
+      const overIsContainer = /^(day|week|month|year):/.test(overId)
+
+      let targetContainer
+      if (overIsContainer) {
+        const parsed = parseContainerId(overId)
+        if (!parsed || parsed.kind !== grain) return tasksBefore
+        targetContainer = overId
+      } else {
+        const overTask = tasksBefore.find((t) => t.id === overId)
+        if (!overTask) return tasksBefore
+        targetContainer = taskContainerId(overTask)
+        if (!targetContainer || !targetContainer.startsWith(`${grain}:`)) return tasksBefore
+      }
+
+      const parsedSource = parseContainerId(source)
+      const parsedTarget = parseContainerId(targetContainer)
+      if (!parsedSource || !parsedTarget) return tasksBefore
+
+      if (source === targetContainer) {
+        const orderedIds = tasksInBucket(tasksBefore, grain, parsedSource.id).map((t) => t.id)
+        const oldIndex = orderedIds.indexOf(activeId)
+        let newIndex
+        if (overIsContainer && overId === source) {
+          newIndex = orderedIds.length - 1
+        } else if (!overIsContainer) {
+          newIndex = orderedIds.indexOf(overId)
+        } else {
+          return tasksBefore
+        }
+        if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return tasksBefore
+        const newOrder = arrayMove(orderedIds, oldIndex, newIndex)
+        return mapWithNewOrders(tasksBefore, grain, parsedSource.id, newOrder)
+      }
+
+      const targetBucketId = parsedTarget.id
+      const targetBefore = tasksInBucket(tasksBefore, grain, targetBucketId).map((t) => t.id)
+
+      let insertIndex
+      if (overIsContainer) {
+        insertIndex = targetBefore.length
+      } else {
+        insertIndex = targetBefore.indexOf(overId)
+        if (insertIndex < 0) insertIndex = targetBefore.length
+      }
+
+      const sourceBucketId = parsedSource.id
+      const at = tasksBefore.find((t) => t.id === activeId)
+      if (!at) return tasksBefore
+
+      let next = tasksBefore.map((t) =>
+        t.id === activeId ? withBucketGrain(at, grain, targetBucketId) : t
+      )
+
+      const targetIds = tasksInBucket(next, grain, targetBucketId)
+        .map((t) => t.id)
+        .filter((id) => id !== activeId)
+      const idx = Math.min(Math.max(0, insertIndex), targetIds.length)
+      const newTargetOrder = [...targetIds.slice(0, idx), activeId, ...targetIds.slice(idx)]
+      next = mapWithNewOrders(next, grain, targetBucketId, newTargetOrder)
+
+      if (sourceBucketId !== targetBucketId) {
+        const sourceIds = tasksInBucket(next, grain, sourceBucketId).map((t) => t.id)
+        next = mapWithNewOrders(next, grain, sourceBucketId, sourceIds)
+      }
+
+      return next
+    })
+  }, [])
+
+  const modalTask = modalTaskId ? tasks.find((t) => t.id === modalTaskId) ?? null : null
 
   return (
-    // App "shell": sidebar on the left, active panel on the right.
-    <div className="flex h-screen text-gray-300" style={{ backgroundColor: '#1A1A1A' }}>
-      <Sidebar activePanel={activePanel} onSelect={setActivePanel} />
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Horizon: main task timeline view */}
-        {activePanel === 'horizon' && (
-          <HorizonPanel
-            tasksByDate={tasksByDate}
-            onAddTask={handleAddTask}
-            onToggleTask={handleToggleTask}
-            onEditTask={handleEditTask}
-            onDeleteTask={handleDeleteTask}
-            onOpenTask={openTaskModal}
+    <BucketInsightsProvider tasks={tasks}>
+      <div className="flex h-screen bg-newton-charcoal text-newton-text">
+        <Sidebar activePanel={activePanel} onSelect={setActivePanel} />
+        <main className="flex-1 flex flex-col min-w-0">
+          {activePanel === 'horizon' && (
+            <HorizonPanel
+              tasks={tasks}
+              onAddTask={handleAddTask}
+              onToggleTask={handleToggleTask}
+              onEditTask={handleEditTask}
+              onDeleteTask={handleDeleteTask}
+              onOpenTask={openTaskModal}
+              onTasksDragEnd={handleHorizonDragEnd}
+            />
+          )}
+          {activePanel === 'progress' && <ProgressPanel activities={activities} />}
+          {activePanel === 'insights' && (
+            <AIInsightsPanel
+              messages={insightMessages}
+              error={insightError}
+              loading={insightLoading}
+              onSendMessage={handleSendInsightMessage}
+            />
+          )}
+        </main>
+
+        {modalTaskId && modalTask && (
+          <TaskModal
+            task={modalTask}
+            onSave={(patch, meta) => handleModalSave(modalTaskId, patch, meta)}
+            onRequestClose={closeTaskModal}
           />
         )}
-        {/* Progress: activity log */}
-        {activePanel === 'progress' && <ProgressPanel activities={activities} />}
-        {/* AI Insights: UI-only panel for now */}
-        {activePanel === 'insights' && <AIInsightsPanel />}
-      </main>
-
-      {/* Task details modal (only shown when a task is selected). */}
-      {modalTaskRef && modalTask && (
-        <TaskModal
-          task={modalTask}
-          onSave={(patch, meta) => handleModalSave(modalTaskRef.dateKey, modalTaskRef.taskId, patch, meta)}
-          onRequestClose={closeTaskModal}
-        />
-      )}
-    </div>
+      </div>
+    </BucketInsightsProvider>
   )
 }
 

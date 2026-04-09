@@ -79,7 +79,7 @@ function TaskModal({ task, onSave, onRequestClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-newton-charcoal/75 p-4"
       onMouseDown={(e) => {
         // Outside click closes (save-on-close). Clicking inside should not close.
         if (e.target === e.currentTarget) closeAndSave()
@@ -88,16 +88,16 @@ function TaskModal({ task, onSave, onRequestClose }) {
     >
       <div
         ref={dialogRef}
-        className="w-full max-w-lg rounded-xl border border-gray-700 bg-[#1A1A1A] shadow-2xl"
+        className="w-full max-w-lg rounded-xl border border-newton-border bg-newton-surface shadow-2xl"
         role="dialog"
         aria-modal="true"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-gray-800 px-4 py-3">
-          <h2 className="text-sm font-semibold text-gray-200">Task</h2>
+        <div className="flex items-center justify-between border-b border-newton-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-newton-text">Task</h2>
           <button
             type="button"
-            className="p-1 rounded hover:bg-white/10 text-gray-400 hover:text-gray-200"
+            className="p-1 rounded hover:bg-white/10 text-newton-muted hover:text-newton-text"
             onClick={closeAndSave}
             aria-label="Close"
           >
@@ -113,24 +113,24 @@ function TaskModal({ task, onSave, onRequestClose }) {
 
         <div className="px-4 py-4 space-y-4">
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Title</label>
+            <label className="block text-xs text-newton-muted mb-1">Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onBlur={handleTitleBlur}
-              className="w-full bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-600"
+              className="w-full bg-newton-charcoal/50 border border-newton-border rounded-lg px-3 py-2 text-sm text-newton-text focus:outline-none focus:ring-1 focus:ring-newton-border"
             />
           </div>
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Description</label>
+            <label className="block text-xs text-newton-muted mb-1">Description</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionBlur}
               rows={6}
-              className="w-full resize-none bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-gray-600"
+              className="w-full resize-none bg-newton-charcoal/50 border border-newton-border rounded-lg px-3 py-2 text-sm text-newton-text placeholder-newton-muted focus:outline-none focus:ring-1 focus:ring-newton-border"
               placeholder="Add a description..."
             />
           </div>

@@ -4,7 +4,7 @@ import { useState } from 'react'
 // - checkbox to complete
 // - text (or inline edit input)
 // - hover-only options menu (Edit/Delete)
-function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed from DayColumn
+function TaskItem({ task, onToggle, onEdit, onDelete, onOpen, dragHandleProps }) {
   const [showMenu, setShowMenu] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(task.text)
@@ -43,23 +43,42 @@ function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed
       role="button"
       tabIndex={isEditing ? -1 : 0}
       onClick={() => {
-        if (!isEditing) onOpen()
+        if (!isEditing) onOpen(task.id)
       }}
       onKeyDown={(e) => {
         // Keyboard: Enter opens the modal when the row is focused.
         if (e.key === 'Enter' && e.target === e.currentTarget && !isEditing) {
           e.preventDefault()
-          onOpen()
+          onOpen(task.id)
         }
       }}
     >
+      {dragHandleProps && (
+        <button
+          type="button"
+          className="mt-1 p-0.5 rounded text-newton-muted hover:text-newton-text cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
+          aria-label="Drag to reorder"
+          onClick={(e) => e.stopPropagation()}
+          {...dragHandleProps}
+        >
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+            <circle cx="6" cy="4" r="1.2" />
+            <circle cx="10" cy="4" r="1.2" />
+            <circle cx="6" cy="8" r="1.2" />
+            <circle cx="10" cy="8" r="1.2" />
+            <circle cx="6" cy="12" r="1.2" />
+            <circle cx="10" cy="12" r="1.2" />
+          </svg>
+        </button>
+      )}
       {/* Completion toggle (must NOT open the modal) */}
       <input
         type="checkbox"
         checked={task.completed}
         onClick={(e) => e.stopPropagation()}
         onChange={() => onToggle(task.id)}
-        className="mt-1.5 w-4 h-4 rounded border-gray-600 bg-transparent text-gray-500 cursor-pointer flex-shrink-0"
+        className="task-complete-checkbox mt-1.5 h-4 w-4 shrink-0 cursor-pointer appearance-none rounded-none border-2 border-newton-border bg-newton-charcoal transition-[border-color] hover:border-newton-muted checked:bg-center checked:bg-no-repeat checked:bg-[length:12px_12px] focus:outline-none focus-visible:ring-2 focus-visible:ring-newton-border focus-visible:ring-offset-2 focus-visible:ring-offset-newton-charcoal"
+        aria-label={task.completed ? 'Mark incomplete' : 'Mark complete'}
       />
       <div className="flex-1 min-w-0">
         {isEditing ? (
@@ -71,18 +90,18 @@ function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed
             onBlur={handleSaveEdit}
             onKeyDown={handleKeyDown}
             autoFocus
-            className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-gray-500"
+            className="w-full bg-newton-charcoal border border-newton-border rounded px-2 py-1 text-sm text-newton-text focus:outline-none focus:ring-1 focus:ring-newton-border"
           />
         ) : (
           // Normal display state (row click/Enter opens the modal)
           <div className={`inline-flex items-center gap-2 text-sm ${
-            task.completed ? 'line-through text-gray-500' : 'text-gray-300'
+            task.completed ? 'line-through text-newton-muted' : 'text-newton-text'
           }`}>
             <span>{task.text}</span>
             {/* {Description icon} */}
             {hasDescription && (
               <svg
-                className="w-4 h-4 text-gray-500"
+                className="w-4 h-4 text-newton-muted"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -108,7 +127,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed
             e.stopPropagation()
             setShowMenu(!showMenu)
           }}
-          className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-gray-300"
+          className="p-1 rounded hover:bg-white/10 text-newton-muted hover:text-newton-text"
           aria-label="Options"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,7 +139,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed
             {/* Click-away overlay to close the menu when clicking outside. */}
             <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} aria-hidden="true" />
             {/* Small dropdown menu positioned next to the options button. */}
-            <div className="absolute right-0 top-full mt-1 z-20 py-1 w-28 bg-gray-800 border border-gray-700 rounded-lg shadow-xl">
+            <div className="absolute right-0 top-full mt-1 z-20 py-1 w-28 bg-newton-surface border border-newton-border rounded-lg shadow-xl">
               <button
                 type="button"
                 onClick={(e) => {
@@ -129,7 +148,7 @@ function TaskItem({ task, onToggle, onEdit, onDelete, onOpen }) { //Props passed
                   setIsEditing(true)
                   setShowMenu(false)
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-white/10"
+                className="w-full px-3 py-2 text-left text-sm text-newton-text hover:bg-white/10"
               >
                 Edit
               </button>
